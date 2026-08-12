@@ -2,7 +2,9 @@
 
 ![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
 ![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-green)
-![OS](https://img.shields.io/badge/OS-Windows-lightgrey)
+![Windows](https://img.shields.io/badge/OS-Windows-0078D6?logo=windows&logoColor=white)
+![macOS](https://img.shields.io/badge/OS-macOS-000000?logo=apple&logoColor=white)
+![Linux](https://img.shields.io/badge/OS-Linux-FCC624?logo=linux&logoColor=black)
 ![License](https://img.shields.io/badge/License-MIT-orange)
 
 A powerful, secure, and automated bridge that allows web-based AI models (like ChatGPT, Claude, Kimi) to interact directly with your local operating system. By utilizing Chrome's **Native Messaging API**, this project enables AI to execute local Python scripts, manage files, and perform OS-level tasks safely from the browser, effectively turning any web AI into a local execution agent.

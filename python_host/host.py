@@ -2,6 +2,7 @@ import sys
 import json
 import struct
 import os
+import platform
 
 def get_message():
     # Read the message length (first 4 bytes)
@@ -30,21 +31,36 @@ def main():
         message = get_message()
         
         if message.get("action") == "create_folder":
-            # Dynamically get the current user's profile directory (Data Sanitization)
-            user_profile = os.environ.get('USERPROFILE')
+            system_os = platform.system()
             
-            # Fallback mechanism: Try OneDrive Desktop first, then default Desktop
-            desktop_path = os.path.join(user_profile, 'OneDrive', 'Desktop')
-            if not os.path.exists(desktop_path):
-                desktop_path = os.path.join(user_profile, 'Desktop')
+            # Resolve the correct absolute path to the user's Desktop
+            if system_os == "Windows":
+                user_profile = os.environ.get('USERPROFILE')
+                # Check for OneDrive backup, which alters the standard Desktop path
+                desktop_path = os.path.join(user_profile, 'OneDrive', 'Desktop')
+                if not os.path.exists(desktop_path):
+                    # Fallback to standard local Desktop
+                    desktop_path = os.path.join(user_profile, 'Desktop')
+                    
+            elif system_os == "Darwin": # macOS
+                # Mac path resolution
+                user_home = os.path.expanduser("~")
+                desktop_path = os.path.join(user_home, 'Desktop')
+                
+            else:
+                # Failsafe for unsupported operating systems (e.g., Linux)
+                send_message({"status": "error", "msg": f"Unsupported OS: {system_os}"})
+                continue
                 
             folder_name = message.get("folder_name", "AI_Magic_Folder")
             full_path = os.path.join(desktop_path, folder_name)
             
             try:
+                # Execute the actual file system operation
                 os.makedirs(full_path, exist_ok=True)
-                send_message({"status": "success", "msg": f"Folder '{folder_name}' created!"})
+                send_message({"status": "success", "msg": f"Folder '{folder_name}' created on {system_os}!"})
             except Exception as e:
+                # Catch permission errors or disk issues and send them back to the browser UI
                 send_message({"status": "error", "msg": str(e)})
 
 if __name__ == '__main__':

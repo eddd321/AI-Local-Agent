@@ -1,15 +1,111 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <style>
-    body { width: 200px; padding: 10px; font-family: sans-serif; text-align: center; }
-    button { padding: 8px 12px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local AI Agent Control Panel</title>
+    <style>
+        /* -----------------------------------------------------------------
+           UI STYLING: Designed for a clean, modern, dark-mode/light-mode feel
+           ----------------------------------------------------------------- */
+        body {
+            width: 320px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 16px;
+            background-color: #f9f9fb;
+            color: #333;
+        }
+
+        h2 {
+            font-size: 16px;
+            margin-top: 0;
+            margin-bottom: 12px;
+            color: #111;
+        }
+
+        label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #555;
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        /* Textarea for user input (where the user types commands or code) */
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 8px;
+            box-sizing: border-box;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 13px;
+            resize: vertical;
+            font-family: monospace; /* Monospace font looks better for code/commands */
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        textarea:focus {
+            border-color: #2563eb;
+        }
+
+        /* Primary action button */
+        button {
+            width: 100%;
+            margin-top: 12px;
+            padding: 10px;
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #1d4ed8;
+        }
+
+        button:active {
+            background-color: #1e40af;
+        }
+
+        /* Result display box (Logs/Feedback from Python backend) */
+        #output {
+            margin-top: 14px;
+            padding: 10px;
+            background-color: #1e293b; /* Dark terminal-like background */
+            color: #38bdf8;          /* Bright cyan text for success/info */
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: monospace;
+            white-space: pre-wrap;    /* Preserve line breaks for error stacks/logs */
+            word-break: break-all;
+            max-height: 120px;
+            overflow-y: auto;         /* Scrollable if output is too long */
+            display: none;            /* Hidden by default until there is output */
+        }
+    </style>
 </head>
 <body>
-  <button id="btn">Create Folder!</button>
-  <p id="result" style="color: #666; font-size: 12px; margin-top: 10px;">Waiting...</p>
-  <script src="popup.js"></script>
+
+    <h2>Local AI Agent</h2>
+    
+    <!-- User Input Section -->
+    <label for="commandInput">Python Command / Task:</label>
+    <textarea id="commandInput" placeholder="Enter instructions or code to execute locally..."></textarea>
+    
+    <!-- Execute Button -->
+    <button id="sendBtn">Send to Local Host</button>
+
+    <!-- Terminal Feedback Output Box -->
+    <div id="output"></div>
+
+    <!-- Link the JavaScript controller -->
+    <script src="popup.js"></script>
 </body>
 </html>

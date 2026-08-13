@@ -1,8 +1,11 @@
+import os
+import platform
 import sys
 import json
 import struct
-import os
-import platform
+import io
+import contextlib
+import traceback
 
 def get_message():
     # Read the message length (first 4 bytes)
@@ -26,42 +29,60 @@ def send_message(message_dict):
     sys.stdout.buffer.write(encoded_content)
     sys.stdout.buffer.flush()
 
+def execute_code(code_string):
+
+    # Create a buffer to capture print() statements
+    output_buffer = io.StringIO()
+    
+    # Define a restricted global namespace (protecting the system)
+    safe_globals = {
+        "__builtins__": __builtins__,
+        "DESKTOP": get_smart_desktop()
+    }
+    
+    try:
+        # Redirect standard output to our capture buffer
+        with contextlib.redirect_stdout(output_buffer):
+            exec(code_string, safe_globals)
+        return "success", output_buffer.getvalue()
+    except Exception:
+        # Capture the full traceback if the code fails
+        return "error", traceback.format_exc()
+
+def get_smart_desktop():
+    system_os = platform.system()
+    
+    if system_os == "Windows":
+        try:
+            import ctypes.wintypes
+            CSIDL_DESKTOPDIRECTORY = 0
+            buf = ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH)
+            ctypes.windll.shell32.SHGetFolderPathW(None, CSIDL_DESKTOPDIRECTORY, None, 0, buf)
+            return buf.value
+        except Exception:
+            user_profile = os.environ.get('USERPROFILE', os.path.expanduser("~"))
+            onedrive_desktop = os.path.join(user_profile, 'OneDrive', 'Desktop')
+            local_desktop = os.path.join(user_profile, 'Desktop')
+            return onedrive_desktop if os.path.exists(onedrive_desktop) else local_desktop
+            
+    elif system_os == "Darwin":  # macOS
+        return os.path.join(os.path.expanduser("~"), "Desktop")
+        
+    else:  # Linux
+        return os.path.join(os.path.expanduser("~"), "Desktop")
+
 def main():
     while True:
         message = get_message()
+        if not message: break
         
-        if message.get("action") == "create_folder":
-            system_os = platform.system()
-            
-            # Resolve the correct absolute path to the user's Desktop
-            if system_os == "Windows":
-                user_profile = os.environ.get('USERPROFILE')
-                # Check for OneDrive backup, which alters the standard Desktop path
-                desktop_path = os.path.join(user_profile, 'OneDrive', 'Desktop')
-                if not os.path.exists(desktop_path):
-                    # Fallback to standard local Desktop
-                    desktop_path = os.path.join(user_profile, 'Desktop')
-                    
-            elif system_os == "Darwin": # macOS
-                # Mac path resolution
-                user_home = os.path.expanduser("~")
-                desktop_path = os.path.join(user_home, 'Desktop')
-                
-            else:
-                # Failsafe for unsupported operating systems (e.g., Linux)
-                send_message({"status": "error", "msg": f"Unsupported OS: {system_os}"})
-                continue
-                
-            folder_name = message.get("folder_name", "AI_Magic_Folder")
-            full_path = os.path.join(desktop_path, folder_name)
-            
-            try:
-                # Execute the actual file system operation
-                os.makedirs(full_path, exist_ok=True)
-                send_message({"status": "success", "msg": f"Folder '{folder_name}' created on {system_os}!"})
-            except Exception as e:
-                # Catch permission errors or disk issues and send them back to the browser UI
-                send_message({"status": "error", "msg": str(e)})
+        action = message.get("action")
+        code = message.get("data")
+        
+        if action == "execute_command":
+            # Pass the code from the popup to our execution engine
+            status, result = execute_code(code)
+            send_message({"status": status, "msg": result})
 
 if __name__ == '__main__':
     main()

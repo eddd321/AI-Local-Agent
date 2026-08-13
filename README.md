@@ -40,9 +40,9 @@ This project implements an Inter-Process Communication (IPC) architecture across
 4. **Fully restart your Chrome browser.**
 
 ### Step 3: Test the Connection
-1. Click the extension icon in your Chrome toolbar.
-2. Click the **Create Folder!** button.
-3. A new folder named `AI_Magic_Folder` will be created seamlessly on your desktop (it will automatically fallback from OneDrive Desktop to standard Desktop if necessary).
+1. Start your Python host daemon (`python python_host/host.py` if running standalone).
+2. Use your web AI to generate code.
+3. Send the code via the extension popup to see it seamlessly execute on your local desktop (with automatic OneDrive and macOS path adaptation).
 
 ## 🛡️ Security Disclaimer
 

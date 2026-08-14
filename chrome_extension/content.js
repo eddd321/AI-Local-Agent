@@ -18,6 +18,60 @@ if (document.getElementById('local-agent-lock')) {
     let injectionInterval;
 
     /**
+     * Put the execution results back into the AI's chat box.
+     * Uses safe methods to ensure the website registers the text correctly.
+     */
+    function feedBackToAI(feedbackText) {
+        // Find the input element on the page (supports ChatGPT, Claude, DeepSeek, Grok, etc.)
+        const inputBox = document.querySelector('#prompt-textarea, textarea[placeholder*="Message"], textarea[placeholder*="Ask"], div[contenteditable="true"]');
+        
+        if (!inputBox) {
+            console.warn("Local Agent Warning: Could not locate AI input DOM element to inject feedback.");
+            return;
+        }
+
+        // Make sure the chat box is selected and active
+        inputBox.focus();
+
+        if (inputBox.tagName === 'TEXTAREA') {
+            // For standard text areas, bypass internal locks to set the text directly
+            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
+            if (nativeInputValueSetter) {
+                nativeInputValueSetter.call(inputBox, feedbackText);
+            } else {
+                inputBox.value = feedbackText;
+            }
+        } else {
+            // For complex text boxes (like ChatGPT), move the cursor to the very end
+            const selection = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(inputBox);
+            range.collapse(false); 
+            selection.removeAllRanges();
+            selection.addRange(range);
+            
+            // Simulate typing the text into the box
+            document.execCommand('insertText', false, feedbackText);
+        }
+
+        // Simulate a paste event so the website saves the new text
+        const dataTransfer = new DataTransfer();
+        dataTransfer.setData('text/plain', feedbackText);
+        const pasteEvent = new ClipboardEvent('paste', {
+            clipboardData: dataTransfer,
+            bubbles: true,
+            cancelable: true
+        });
+        inputBox.dispatchEvent(pasteEvent);
+
+        // Trigger input events so the website knows to enable the "Send" button
+        inputBox.dispatchEvent(new Event('input', { bubbles: true }));
+        inputBox.dispatchEvent(new Event('change', { bubbles: true }));
+
+        console.log("🚀 Feedback successfully injected into AI input box (using Deep Paste Simulation).");
+    }
+
+    /**
      * Main loop to scan the DOM and inject buttons.
      */
     function injectButtons() {
@@ -101,7 +155,7 @@ if (document.getElementById('local-agent-lock')) {
                     codeContent = codeContent
                         .replace(/🚀 Run in Local|⏳ Running...|✅ Success!|❌ Failed|❌ Timeout/g, "")
                         .replace(/<run_code>|<\/run_code>/gi, "")
-                        .replace(/^(python|Copy code|Copy|Download)\b/gim, "") 
+                        .replace(/^(python|Copy code|Copy|Download|Run code|Run)\b/gim, "")
                         .replace(/^```[a-zA-Z]*\n?/gm, "")
                         .replace(/```$/gm, "")
                         .trim();
@@ -137,6 +191,11 @@ if (document.getElementById('local-agent-lock')) {
                                 if (response.msg) {
                                     console.log("💻 Python execution result:\n", response.msg);
                                 }
+                                // Construct feedback if there was stdout
+                                if (response.output && response.output.trim() !== "") {
+                                    const feedback = `[Local Execution Success]\nHere is the terminal output from my local machine:\n\`\`\`text\n${response.output}\n\`\`\`\nPlease confirm if this matches the expected result.`;
+                                    feedBackToAI(feedback);
+                                }
                                 setTimeout(() => resetBtn(btn), 3000);
                             }
                             // Handle Missing Dependencies (Auto-pip workflow) 
@@ -159,10 +218,24 @@ if (document.getElementById('local-agent-lock')) {
                                             if (finalRes.msg) {
                                                 console.log("💻 Python execution result:\n", finalRes.msg);
                                             }
+                                            
+                                            // Construct feedback for successful install+run
+                                            if (finalRes.output && finalRes.output.trim() !== "") {
+                                                const feedback = `[Local Execution Success]\nDependencies were installed automatically. Here is the terminal output from my local machine:\n\`\`\`text\n${finalRes.output}\n\`\`\`\nPlease confirm if this matches the expected result.`;
+                                                feedBackToAI(feedback);
+                                            }
                                         } else {
                                             btn.innerText = "❌ Failed";
                                             btn.style.backgroundColor = '#f44336';
                                             console.error("🐛 Python Code Error:\n", finalRes ? finalRes.msg : "Unknown error");
+                                            
+                                            // Construct feedback for failed install+run
+                                            let feedback = `[Local Execution Failed]\n`;
+                                            if (finalRes && finalRes.output && finalRes.output.trim() !== "") {
+                                                feedback += `The code ran partially. Here is the output before it crashed:\n\`\`\`text\n${finalRes.output}\n\`\`\`\n\n`;
+                                            }
+                                            feedback += `Here is the error traceback:\n\`\`\`python\n${finalRes ? finalRes.msg : "Unknown error"}\n\`\`\`\nPlease analyze the reason for this failure and provide the corrected Python code.`;
+                                            feedBackToAI(feedback);
                                         }
                                         setTimeout(() => resetBtn(btn), 3000);
                                     });
@@ -177,6 +250,15 @@ if (document.getElementById('local-agent-lock')) {
                                 btn.innerText = "❌ Failed";
                                 btn.style.backgroundColor = '#f44336';
                                 console.error("🐛 Python Code Error:\n", response ? response.msg : "No details provided");
+
+                                // Construct feedback for general failure
+                                let feedback = `[Local Execution Failed]\n`;
+                                if (response && response.output && response.output.trim() !== "") {
+                                    feedback += `The code ran partially. Here is the output before it crashed:\n\`\`\`text\n${response.output}\n\`\`\`\n\n`;
+                                }
+                                feedback += `Here is the error traceback:\n\`\`\`python\n${response ? response.msg : "No details provided"}\n\`\`\`\nPlease analyze the reason for this failure and provide the corrected Python code.`;
+                                feedBackToAI(feedback);
+
                                 setTimeout(() => resetBtn(btn), 3000);
                             }
                         });
@@ -202,5 +284,5 @@ if (document.getElementById('local-agent-lock')) {
 
     // Start the continuous DOM scanning loop (every 2 seconds)
     injectionInterval = setInterval(injectButtons, 2000);
-    console.log("✅ Local Agent V4 successfully started (anti-shadow clone singleton lock enabled)!");
+    console.log("✅ Local Agent V1.1.0 successfully started (anti-shadow clone singleton lock + AI Feedback Engine enabled)!");
 }

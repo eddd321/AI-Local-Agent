@@ -49,6 +49,7 @@ def send_message(message_dict):
 
 """
 Execute the provided Python code and capture its output.
+Modified to return output and traceback separately for AI feedback.
 """
 def execute_code(code_string):
     # Try to install any missing packages before running
@@ -72,11 +73,21 @@ def execute_code(code_string):
         # Run the code
         exec(code_string, safe_globals, safe_globals)
         output = output_buffer.getvalue()
-        return {"status": "success", "msg": output if output else "Executed successfully with no output."}
+        return {
+            "status": "success", 
+            "output": output,
+            "msg": output if output else "Executed successfully with no output."
+        }
     except Exception as e:
         # Get the full error traceback if the code crashes
         import traceback
-        return {"status": "error", "msg": traceback.format_exc()}
+        partial_output = output_buffer.getvalue()
+        error_trace = traceback.format_exc()
+        return {
+            "status": "error", 
+            "output": partial_output,
+            "msg": error_trace
+        }
     finally:
         # Always restore the original standard output
         sys.stdout = old_stdout

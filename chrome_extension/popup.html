@@ -5,9 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Local AI Agent Control Panel</title>
     <style>
-        /* -----------------------------------------------------------------
-           UI STYLING: Designed for a clean, modern, dark-mode/light-mode feel
-           ----------------------------------------------------------------- */
+        /* Defines the extension popup dimensions and base typography. */
         body {
             width: 320px;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -32,10 +30,10 @@
             margin-bottom: 6px;
         }
 
-        /* Textarea for user input (where the user types commands or code) */
+        /* Styling for multiline text areas. */
         textarea {
             width: 100%;
-            height: 100px;
+            height: 90px;
             padding: 8px;
             box-sizing: border-box;
             border: 1px solid #d1d5db;
@@ -54,7 +52,7 @@
         /* Primary action button */
         button {
             width: 100%;
-            margin-top: 12px;
+            margin-top: 10px;
             padding: 10px;
             background-color: #2563eb;
             color: white;
@@ -74,20 +72,20 @@
             background-color: #1e40af;
         }
 
-        /* Result display box (Logs/Feedback from Python backend) */
+        /* Dark-themed console window for backend feedback. */
         #output {
             margin-top: 14px;
             padding: 10px;
-            background-color: #1e293b; /* Dark terminal-like background */
-            color: #38bdf8;          /* Bright cyan text for success/info */
+            background-color: #1e293b; 
+            color: #38bdf8;
             border-radius: 6px;
             font-size: 12px;
             font-family: monospace;
-            white-space: pre-wrap;    /* Preserve line breaks for error stacks/logs */
+            white-space: pre-wrap;
             word-break: break-all;
             max-height: 120px;
-            overflow-y: auto;         /* Scrollable if output is too long */
-            display: none;            /* Hidden by default until there is output */
+            overflow-y: auto;
+            display: none;
         }
     </style>
 </head>
@@ -95,15 +93,28 @@
 
     <h2>Local AI Agent</h2>
     
-    <!-- User Input Section -->
+    <!-- Direct bridge to the local host without AI -->
     <label for="commandInput">Python Command / Task:</label>
     <textarea id="commandInput" placeholder="Enter instructions or code to execute locally..."></textarea>
-    
-    <!-- Execute Button -->
     <button id="sendBtn">Send to Local Host</button>
 
-    <!-- Terminal Feedback Output Box -->
+    <!-- Displays stdout and tracebacks from Python -->
     <div id="output"></div>
+
+    <!-- Collapsible panel to inject context into the AI chat -->
+    <div style="margin-top: 14px; border-top: 1px solid #e5e7eb; padding-top: 10px;">
+        <details>
+            <summary style="font-size: 12px; font-weight: 600; cursor: pointer; color: #4b5563;">⚙️ System Prompt Settings</summary>
+            <textarea id="promptInput" rows="5" style="margin-top: 6px; height: 80px; font-size: 11px; font-family: sans-serif;" placeholder="System prompt instructions..."></textarea>
+            <button id="injectPromptBtn" style="margin-top: 6px; padding: 8px; background-color: #4f46e5; font-size: 12px;">📥 Send Prompt to Current AI</button>
+        </details>
+    </div>
+
+    <!-- Controls the content script injection state dynamically -->
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 14px; border-top: 1px solid #e5e7eb; padding-top: 12px; font-family: sans-serif;">
+      <span style="font-size: 13px; font-weight: 500; color: #555;">Web Button Injection</span>
+      <input type="checkbox" id="agentToggle" checked style="width: 18px; height: 18px; cursor: pointer;">
+    </div>
 
     <!-- Link the JavaScript controller -->
     <script src="popup.js"></script>

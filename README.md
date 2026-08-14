@@ -1,4 +1,4 @@
-# 🤖 Local AI Agent (Chrome to OS Bridge)
+# 🤖 Local AI Agent v1.0.0 (Chrome to OS Bridge)
 
 ![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
 ![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-green)
@@ -7,22 +7,24 @@
 ![Linux](https://img.shields.io/badge/OS-Linux-FCC624?logo=linux&logoColor=black)
 ![License](https://img.shields.io/badge/License-MIT-orange)
 
-A powerful, secure, and automated bridge that allows web-based AI models (like ChatGPT, Claude, Kimi) to interact directly with your local operating system. By utilizing Chrome's **Native Messaging API**, this project enables AI to execute local Python scripts, manage files, and perform OS-level tasks safely from the browser, effectively turning any web AI into a local execution agent.
+A powerful, secure, and automated bridge that allows web-based AI models (like **ChatGPT, Claude, DeepSeek, and Gemini**) to interact directly with your local operating system. By utilizing Chrome's **Native Messaging API**, this project injects a one-click execution environment directly into your browser, enabling AI to execute local Python scripts, manage files, and perform OS-level tasks safely—effectively turning any web AI into a powerful local execution agent.
 
 ## ✨ Features
 
-- **Zero-Configuration Setup:** Comes with an intelligent `install.py` wizard that automatically detects your system paths and configures the Windows Registry. No manual template editing required.
-- **True Local Execution:** Bypasses browser sandboxes to run native OS commands directly via a Python daemon. Does not require setting up a local web server (No Flask/FastAPI required).
-- **Data Sanitization & Privacy:** 100% privacy-focused. No personal absolute paths or usernames are hardcoded in the repository. The environment resolves dynamically on the host machine.
-- **Event-Driven Architecture:** Minimal resource footprint. The Python script acts as a daemon, sleeping until an event is triggered from the Chrome extension interface.
+- **🚀 One-Click UI Injection:** Automatically injects a native `🚀 Run in Local` button directly onto code blocks in ChatGPT, Claude, and DeepSeek interfaces. No copy-pasting required.
+- **📦 Smart Dependency Management:** Before executing code, the backend automatically scans Python `import` statements, detects missing libraries (e.g., mapping `PIL` to `pillow`), and prompts you via the browser to install them via `pip` with a single click.
+- **🧹 Bulletproof Code Extraction:** Advanced DOM parsing that accurately extracts pure Python code. It intelligently strips out AI UI artifacts ("Copy", "Download" buttons) and sanitizes invisible characters (like Claude's Non-Breaking Spaces `\xA0`) that would otherwise crash the Python interpreter.
+- **🧠 Intelligent Execution Sandbox:** Dynamically resolves your local `DESKTOP` path (perfectly handling Windows OneDrive, standard Windows, and macOS paths). It also spoofs the `__name__ == "__main__"` context, ensuring complex, multi-function scripts run flawlessly without modification.
+- **⚡ True Local Execution (No Servers):** Bypasses browser sandboxes to run native OS commands directly via a Python daemon. Does not require setting up a local web server (No Flask/FastAPI footprint).
+- **🔒 Data Sanitization & Privacy:** 100% privacy-focused. No personal absolute paths or usernames are hardcoded. The daemon sleeps completely idle until triggered by the Chrome extension.
 
 ## 🏗️ Architecture
 
-This project implements an Inter-Process Communication (IPC) architecture across the browser sandbox:
+This project implements a seamless Inter-Process Communication (IPC) architecture across the browser sandbox:
 
-1. **Frontend (Chrome Extension):** Captures user intent and sends a JSON payload via `chrome.runtime.sendNativeMessage`.
-2. **OS Router (Windows Registry):** Validates the extension ID whitelist and routes the payload to the local execution environment.
-3. **Backend (Python Host):** Reads the binary payload from standard input (`sys.stdin`), executes the requested system operations (e.g., `os.makedirs`), and returns the execution status via standard output (`sys.stdout`).
+1. **Frontend (Chrome Extension):** Uses a Singleton Lock to prevent duplicate UI injections. It captures code from the AI's DOM, cleans it, and sends a JSON payload via `chrome.runtime.sendNativeMessage`.
+2. **OS Router (Windows Registry/macOS Native Messaging):** Validates the extension ID whitelist and securely routes the payload to the local execution environment.
+3. **Backend (Python Host):** Reads the binary payload from standard input (`sys.stdin`), executes the code using `exec()` within a safe global environment, intercepts standard output/tracebacks via `io.StringIO`, and returns execution logs directly to the browser UI or alert popups.
 
 ## 🚀 Installation & Usage
 
@@ -36,17 +38,17 @@ This project implements an Inter-Process Communication (IPC) architecture across
 ### Step 2: Run the Auto-Installer
 1. Navigate to the `python_host` folder on your local machine.
 2. Run `install.py` using your Python interpreter (double-click it or run via terminal).
-3. Paste your **Extension ID** into the terminal when prompted. The script will automatically generate the required `manifest.json` and safely configure your Windows Registry.
+3. Paste your **Extension ID** into the terminal when prompted. The script will automatically generate the required `manifest.json` and safely configure your Windows Registry (or macOS equivalent).
 4. **Fully restart your Chrome browser.**
 
-### Step 3: Test the Connection
-1. Start your Python host daemon (`python python_host/host.py` if running standalone).
-2. Use your web AI to generate code.
-3. Send the code via the extension popup to see it seamlessly execute on your local desktop (with automatic OneDrive and macOS path adaptation).
+### Step 3: Magic in Action
+1. Ask ChatGPT, Claude, or DeepSeek to write a Python script (e.g., *"Write a script to generate a QR code and save it to my desktop"*).
+2. You will see a green `🚀 Run in Local` button instantly appear on the AI's code block.
+3. Click it. The code will execute on your machine, auto-install required packages, and save files directly to your local OS. Check the browser console (`F12`) or UI alerts for real-time Python output and error tracebacks!
 
 ## 🛡️ Security Disclaimer
 
-This tool grants web browsers access to your local file system. The Native Messaging host will ONLY accept connections from the specific Chrome Extension ID you provide during the installation wizard. **Do not** manually modify the `allowed_origins` in the manifest to include unknown or untrusted extensions.
+This tool grants web browsers execution access to your local file system. The Native Messaging host will ONLY accept connections from the specific Chrome Extension ID you provide during the installation wizard. **Do not** manually modify the `allowed_origins` in the manifest to include unknown or untrusted extensions. Only run code generated by AI that you understand and trust.
 
 ## 📄 License
 

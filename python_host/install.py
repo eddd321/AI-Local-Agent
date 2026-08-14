@@ -1,3 +1,9 @@
+"""
+This script registers the local Python host with the Chrome browser.
+It figures out your operating system, creates a configuration file (manifest), 
+and tells Chrome where to find the Python backend so they can communicate.
+"""
+
 import os
 import json
 import platform

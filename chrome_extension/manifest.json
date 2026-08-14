@@ -1,11 +1,43 @@
 {
   "manifest_version": 3,
-  "name": "ChatGPT Local Agent",
+  "name": "Local AI Agent",
   "version": "1.0",
+  "description": "Run web AI generated code locally.",
   "permissions": [
-    "nativeMessaging"
+    "nativeMessaging",
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs"
   ],
   "action": {
     "default_popup": "popup.html"
-  }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://claude.ai/*",
+        "https://kimi.moonshot.cn/*",
+        "https://gemini.google.com/*",
+        "https://aistudio.google.com/*",
+        "https://copilot.microsoft.com/*",
+        "https://yiyan.baidu.com/*",
+        "https://tongyi.aliyun.com/*",
+        "https://doubao.com/*",
+        "https://poe.com/*",
+        "https://chat.mistral.ai/*",
+        "https://huggingface.co/chat/*",
+        "https://pi.ai/*",
+        "https://perplexity.ai/*",
+        "https://chat.deepseek.com/*",
+        "https://grok.com/*"
+      ],
+      "js": ["content.js"]
+    }
+  ]
 }

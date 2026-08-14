@@ -18,7 +18,7 @@ Read a message sent from the Chrome Extension via standard input.
 """
 def get_message():
     # Read the message length (first 4 bytes)
-    raw_length = sys.stdin.buffer.read(4)
+    raw_length = sys.__stdin__.buffer.read(4)
     if len(raw_length) == 0:
         # Exit if the extension closed the connection
         sys.exit(0)
@@ -27,7 +27,7 @@ def get_message():
     message_length = struct.unpack('@I', raw_length)[0]
     
     # Read the actual message based on the length and parse the JSON
-    message = sys.stdin.buffer.read(message_length).decode('utf-8')
+    message = sys.__stdin__.buffer.read(message_length).decode('utf-8')
     return json.loads(message)
 
 """
@@ -41,11 +41,11 @@ def send_message(message_dict):
     encoded_length = struct.pack('@I', len(encoded_content))
     
     # Send the length followed by the actual message
-    sys.stdout.buffer.write(encoded_length)
-    sys.stdout.buffer.write(encoded_content)
+    sys.__stdout__.buffer.write(encoded_length)
+    sys.__stdout__.buffer.write(encoded_content)
 
     # Flush the buffer to ensure the message is sent immediately
-    sys.stdout.buffer.flush()
+    sys.__stdout__.buffer.flush()
 
 """
 Execute the provided Python code and capture its output.
@@ -58,11 +58,22 @@ def execute_code(code_string):
     # Create a string buffer to catch print statements
     output_buffer = io.StringIO()
 
+    def custom_input(prompt_text=""):
+        # Pause execution and ask the browser for input
+        send_message({
+            "status": "input_request",
+            "prompt": prompt_text
+        })
+        # Wait here until the browser sends back the user's typed answer
+        response = get_message()
+        return response.get("data", "") if response else ""
+
     # Set up global variables for the script to use
     safe_globals = {
         "__builtins__": __builtins__,
         "DESKTOP": get_smart_desktop(),
-        "__name__": "__main__"
+        "__name__": "__main__",
+        "input": custom_input
     }
 
     # Temporarily redirect standard output
@@ -193,45 +204,58 @@ def check_missing_packages(code_string):
 Main loop to keep the script running and listening for commands.
 """
 def main():
+    # Keep the program running forever to listen for new messages
     while True:
         message = get_message()
         if not message: 
-            break
+            break # Stop if the browser disconnects
         
+        # If we get an answer for an input request, skip it here (custom_input handles it)
+        if message.get("action") == "input_response":
+            continue 
+
         action = message.get("action")
-        code = message.get("data")
-        
+        code = message.get("code")
+
+        # Run the code
         if action == "execute_command":
-            # Check for missing packages first
+            if not code:
+                send_message({"status": "error", "msg": "Fatal Error: No code received."})
+                continue
+
+            # Check if any packages need to be installed first
             missing_libs = check_missing_packages(code)
-            # Ask the extension to prompt the user for installation
             if missing_libs:
+                # Tell the browser we need to install packages
                 send_message({
                     "status": "need_install", 
                     "packages": missing_libs,
                     "msg": f"Detected missing packages: {', '.join(missing_libs)}"
                 })
-            # Run the code if everything is ready
             else:
+                # Run the code and send the result back
                 response_dict = execute_code(code)
                 send_message(response_dict)
-                
+
+        # Action: Install missing packages, then run the code        
         elif action == "confirm_install_and_run":
-            # Install packages after user confirmation, then run
             missing_libs = message.get("packages", [])
             for lib in missing_libs:
                 try:
+                    # Silently install the package using pip
                     subprocess.check_call(
                         [sys.executable, "-m", "pip", "install", lib],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL
                     )
                 except Exception:
-                    pass
+                    pass # Ignore errors if install fails
 
+            # Run the code after installing and send the result back
             response_dict = execute_code(code)
             send_message(response_dict)
-            
+
+        # Unknown action fallback            
         else:
             send_message({"status": "error", "msg": f"Unknown action: {action}"})
 

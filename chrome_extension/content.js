@@ -16,6 +16,7 @@ if (document.getElementById('local-agent-lock')) {
     document.body.appendChild(lock);
 
     let injectionInterval;
+    window.__activeAgentBlock = null;
 
     /**
      * Put the execution results back into the AI's chat box.
@@ -71,6 +72,67 @@ if (document.getElementById('local-agent-lock')) {
         console.log("🚀 Feedback successfully injected into AI input box (using Deep Paste Simulation).");
     }
 
+    // Listen for input requests from background.js and show a text box
+    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+        if (msg.action === "input_request") {
+            const block = window.__activeAgentBlock;
+            if (!block) return;
+
+            const container = document.createElement('div');
+            container.style.marginTop = '12px';
+            container.style.padding = '12px';
+            container.style.backgroundColor = '#f8fafc';
+            container.style.borderLeft = '4px solid #3b82f6'; 
+            container.style.borderRadius = '4px';
+
+            const promptLabel = document.createElement('div');
+            promptLabel.innerText = "🐍 Python Requires Input: " + msg.prompt;
+            promptLabel.style.color = '#334155';
+            promptLabel.style.marginBottom = '8px';
+            promptLabel.style.fontWeight = 'bold';
+
+            const inputField = document.createElement('input');
+            inputField.type = 'text';
+            inputField.style.width = '100%';
+            inputField.style.padding = '8px';
+            inputField.style.border = '1px solid #cbd5e1';
+            inputField.style.borderRadius = '4px';
+            inputField.style.boxSizing = 'border-box';
+            inputField.style.marginBottom = '8px';
+
+            const submitBtn = document.createElement('button');
+            submitBtn.innerText = "↵ Send to Python";
+            submitBtn.style.backgroundColor = '#3b82f6';
+            submitBtn.style.color = 'white';
+            submitBtn.style.border = 'none';
+            submitBtn.style.padding = '6px 12px';
+            submitBtn.style.borderRadius = '4px';
+            submitBtn.style.cursor = 'pointer';
+
+            container.appendChild(promptLabel);
+            container.appendChild(inputField);
+            container.appendChild(submitBtn);
+
+            block.parentElement.insertBefore(container, block.nextSibling);
+            inputField.focus();
+
+            const submitInput = () => {
+                const val = inputField.value;
+                container.remove(); 
+                sendResponse(val);
+            };
+
+            submitBtn.onclick = submitInput;
+            inputField.onkeydown = (e) => { 
+                if (e.key === 'Enter') {
+                    submitInput();
+                }
+            };
+
+            return true;
+        }
+    });
+
     /**
      * Main loop to scan the DOM and inject buttons.
      */
@@ -123,7 +185,6 @@ if (document.getElementById('local-agent-lock')) {
                 
                 // Style adjustments, leave space on the right to avoid overlapping with native copy buttons
                 btn.style.position = 'absolute';
-                btn.style.position = 'absolute';
                 btn.style.top = '45px';
                 btn.style.right = '12px'; 
                 btn.style.zIndex = '9999';
@@ -146,6 +207,7 @@ if (document.getElementById('local-agent-lock')) {
                 btn.addEventListener('click', (e) => {
                     // Prevent triggering the website's native click events (e.g., expanding the block)
                     e.stopPropagation();
+                    window.__activeAgentBlock = block;
 
                     // Extract text content from the <code> tag or the block itself
                     const codeElement = block.querySelector('code');
@@ -164,33 +226,17 @@ if (document.getElementById('local-agent-lock')) {
                     btn.innerText = "⏳ Running...";
                     btn.style.backgroundColor = '#ff9800';
 
-                    // Prevent the UI from hanging infinitely
-                    let hasResponded = false;
-                    const timeoutTimer = setTimeout(() => {
-                        if (!hasResponded) {
-                            btn.innerText = "❌ Timeout";
-                            btn.style.backgroundColor = '#f44336';
-                            console.warn("Local Agent Notice: Connection timeout, backend host.py is not responding.");
-                            setTimeout(() => resetBtn(btn), 3000);
-                        }
-                    }, 8000);
-
                     // Send the sanitized code to the background script
                     try {
                         chrome.runtime.sendMessage({
                             action: "execute_command",
                             code: codeContent
                         }, (response) => {
-                            hasResponded = true;
-                            clearTimeout(timeoutTimer);
-
                             // Handle Standard Success
                             if (response && response.status === "success") {
                                 btn.innerText = "✅ Success!";
                                 btn.style.backgroundColor = '#10a37f';
-                                if (response.msg) {
-                                    console.log("💻 Python execution result:\n", response.msg);
-                                }
+                                
                                 // Construct feedback if there was stdout
                                 if (response.output && response.output.trim() !== "") {
                                     const feedback = `[Local Execution Success]\nHere is the terminal output from my local machine:\n\`\`\`text\n${response.output}\n\`\`\`\nPlease confirm if this matches the expected result.`;
@@ -215,9 +261,6 @@ if (document.getElementById('local-agent-lock')) {
                                         if (finalRes && finalRes.status === "success") {
                                             btn.innerText = "✅ Success!";
                                             btn.style.backgroundColor = '#10a37f';
-                                            if (finalRes.msg) {
-                                                console.log("💻 Python execution result:\n", finalRes.msg);
-                                            }
                                             
                                             // Construct feedback for successful install+run
                                             if (finalRes.output && finalRes.output.trim() !== "") {
@@ -227,7 +270,6 @@ if (document.getElementById('local-agent-lock')) {
                                         } else {
                                             btn.innerText = "❌ Failed";
                                             btn.style.backgroundColor = '#f44336';
-                                            console.error("🐛 Python Code Error:\n", finalRes ? finalRes.msg : "Unknown error");
                                             
                                             // Construct feedback for failed install+run
                                             let feedback = `[Local Execution Failed]\n`;
@@ -249,7 +291,6 @@ if (document.getElementById('local-agent-lock')) {
                             else {
                                 btn.innerText = "❌ Failed";
                                 btn.style.backgroundColor = '#f44336';
-                                console.error("🐛 Python Code Error:\n", response ? response.msg : "No details provided");
 
                                 // Construct feedback for general failure
                                 let feedback = `[Local Execution Failed]\n`;
@@ -263,8 +304,6 @@ if (document.getElementById('local-agent-lock')) {
                             }
                         });
                     } catch (err) {
-                        hasResponded = true;
-                        clearTimeout(timeoutTimer);
                         btn.innerText = "❌ Error";
                         btn.style.backgroundColor = '#f44336';
                         setTimeout(() => resetBtn(btn), 3000);
@@ -284,5 +323,5 @@ if (document.getElementById('local-agent-lock')) {
 
     // Start the continuous DOM scanning loop (every 2 seconds)
     injectionInterval = setInterval(injectButtons, 2000);
-    console.log("✅ Local Agent V1.1.0 successfully started (anti-shadow clone singleton lock + AI Feedback Engine enabled)!");
+    console.log("✅ Local Agent V1.2.0 successfully started (anti-shadow clone singleton lock + AI Feedback Engine + User Input enabled)!");
 }

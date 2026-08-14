@@ -1,31 +1,56 @@
 /**
- * Background Service Worker
- * Listens for messages from the content script and acts as a proxy 
- * to communicate with the local Python host via Chrome Native Messaging.
+ * Local AI Agent - Background Service Worker
+ * Keeps a continuous connection open for interactive inputs.
  */
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Route specific actions to the native messaging host
     if (request.action === "execute_command" || request.action === "confirm_install_and_run") {
-        // Send the payload to the registered native application (host.py)
-        chrome.runtime.sendNativeMessage(
-            'com.local.ai_agent',
-            { 
-                action: request.action,
-                data: request.code,
-                packages: request.packages || [] 
-            },
-            
-            (response) => {
-                // Handle connection errors or return the host's response back to the content script
-                if (chrome.runtime.lastError) {
-                    sendResponse({ status: "error", msg: chrome.runtime.lastError.message });
-                } else {
-                    sendResponse(response); 
+        
+        const HOST_NAME = "com.local.ai_agent";
+        const activeNativePort = chrome.runtime.connectNative(HOST_NAME);
+        
+        // Lock to make sure we only reply once
+        let hasResponded = false; 
+
+        activeNativePort.onMessage.addListener((response) => {
+            // If Python asks for user input in the middle of running
+            if (response.status === "input_request") {
+                chrome.tabs.sendMessage(sender.tab.id, {
+                    action: "input_request",
+                    prompt: response.prompt
+                }, (userInput) => {
+                    // Send what the user typed back to Python
+                    activeNativePort.postMessage({ action: "input_response", data: userInput });
+                });
+            } 
+            // If Python is done and sends the final result
+            else {
+                hasResponded = true;
+                sendResponse(response);
+                activeNativePort.disconnect(); 
+            }
+        });
+
+        activeNativePort.onDisconnect.addListener(() => {
+            if (chrome.runtime.lastError) {
+                console.error("Native Host Disconnected:", chrome.runtime.lastError.message);
+                
+                // If Python crashes suddenly, tell the webpage so it doesn't wait forever
+                if (!hasResponded) {
+                    hasResponded = true;
+                    sendResponse({
+                        status: "error",
+                        msg: "Fatal Error: The local Python host crashed unexpectedly. \nPossible reasons:\n1. A typo in the code sending data.\n2. A sudden crash in Python."
+                    });
                 }
             }
-        );
+        });
 
-        // Return true to indicate that the response will be sent asynchronously
-        return true;
+        // Start sending the code to Python
+        activeNativePort.postMessage(request);
+        
+        // Keep the connection open to wait for the answer
+        return true; 
     }
 });

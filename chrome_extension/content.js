@@ -208,6 +208,11 @@ if (document.getElementById('local-agent-lock')) {
                 btn.addEventListener('click', (e) => {
                     // Prevent triggering the website's native click events (e.g., expanding the block)
                     e.stopPropagation();
+
+                    if (btn.innerText !== "🚀 Run in Local") {
+                        return;
+                    }
+                    
                     window.__activeAgentBlock = block;
                     // State lock to prevent errors when pipeline disconnects
                     let isAborted = false;
@@ -276,102 +281,133 @@ if (document.getElementById('local-agent-lock')) {
                         setTimeout(() => resetBtn(btn), 3000);
                     });
 
-                    // Send the sanitized code to the background script
-                    try {
-                        chrome.runtime.sendMessage({
-                            action: "execute_command",
-                            code: codeContent
-                        }, (response) => {
-                            // Silently terminate if the user clicked Stop
+                    // Put the sending logic in a function to try again if needed
+                    const sendExecutionRequest = (bypassSecurity = false) => {
+                        try {
+                            chrome.runtime.sendMessage({
+                                action: "execute_command",
+                                code: codeContent,
+                                bypass_security: bypassSecurity // Tell Python forcing it to run
+                            }, (response) => {
+                                
+                                // Stop doing anything if the user already clicked Stop
+                                if (isAborted) return; 
+
+                                // Security Warning
+                                if (response && response.status === "security_warning") {
+                                    const reasons = response.reasons.join(", ");
+                                    const userAccepted = confirm(`🛡️ SECURITY WARNING\n\nThis script is trying to change or delete files.\n\nActions found:\n[ ${reasons} ]\n\nDo you want to ALLOW this to run?`);
+                                    
+                                    if (userAccepted) {
+                                        // User said yes: show red button and try again without security checks
+                                        btn.innerText = "⏳ Bypassing Sandbox...";
+                                        btn.style.backgroundColor = '#f44336';
+                                        sendExecutionRequest(true); 
+                                    } else {
+                                        // User said no: cancel everything
+                                        if (stopBtn.parentNode) stopBtn.remove();
+                                        btn.innerText = "❌ Blocked";
+                                        btn.style.backgroundColor = '#9e9e9e';
+                                        setTimeout(() => resetBtn(btn), 3000);
+                                    }
+                                    return; // Stop here and wait for the next try
+                                }
+
+                                // Remove the Stop button when finished
+                                if (stopBtn.parentNode) stopBtn.remove();
+
+                                // Handle Standard Success
+                                if (response && response.status === "success") {
+                                    btn.innerText = "✅ Success!";
+                                    btn.style.backgroundColor = '#10a37f';
+                                    
+                                    if (response.output && response.output.trim() !== "") {
+                                        const feedback = `[Local Execution Success]\nHere is the terminal output from my local machine:\n\`\`\`text\n${response.output}\n\`\`\`\nPlease confirm if this matches the expected result.`;
+                                        feedBackToAI(feedback);
+                                    }
+                                    setTimeout(() => resetBtn(btn), 3000);
+                                }
+                                // Handle Missing Dependencies (Auto-pip workflow)
+                                else if (response && response.status === "need_install") {
+                                    const pkgs = response.packages.join(", ");
+                                    const userAccepted = confirm(`📦 This script requires external packages: [ ${pkgs} ].\n\nDo you want the local agent to install them and run the code?`);
+                                    
+                                    if (userAccepted) {
+                                        btn.innerText = "⏳ Installing...";
+                                        btn.style.backgroundColor = '#ff9800';
+                                        
+                                        chrome.runtime.sendMessage({
+                                            action: "confirm_install_and_run",
+                                            code: codeContent,
+                                            packages: response.packages
+                                        }, (finalRes) => {
+                                            if (isAborted) {
+                                                return;
+                                            } 
+
+                                            // Construct feedback for successful install + run
+                                            if (finalRes && finalRes.status === "success") {
+                                                btn.innerText = "✅ Success!";
+                                                btn.style.backgroundColor = '#10a37f';
+                                                
+                                                if (finalRes.output && finalRes.output.trim() !== "") {
+                                                    const feedback = `[Local Execution Success]\nDependencies were installed automatically. Here is the terminal output from my local machine:\n\`\`\`text\n${finalRes.output}\n\`\`\`\nPlease confirm if this matches the expected result.`;
+                                                    feedBackToAI(feedback);
+                                                }
+                                            } else {
+                                                btn.innerText = "❌ Failed";
+                                                btn.style.backgroundColor = '#f44336';
+                                                
+                                                // Construct feedback for failed install + run
+                                                let feedback = `[Local Execution Failed]\n`;
+                                                if (finalRes && finalRes.output && finalRes.output.trim() !== "") {
+                                                    feedback += `The code ran partially. Here is the output before it crashed:\n\`\`\`text\n${finalRes.output}\n\`\`\`\n\n`;
+                                                }
+                                                feedback += `Here is the error traceback:\n\`\`\`python\n${finalRes ? finalRes.msg : "Unknown error"}\n\`\`\`\nPlease analyze the reason for this failure and provide the corrected Python code.`;
+                                                feedBackToAI(feedback);
+                                            }
+                                            setTimeout(() => resetBtn(btn), 3000);
+                                        });
+                                    } else {
+                                        btn.innerText = "❌ Cancelled";
+                                        btn.style.backgroundColor = '#9e9e9e';
+                                        setTimeout(() => resetBtn(btn), 3000);
+                                    }
+                                }
+                                // Handle General Execution Failure 
+                                else {
+                                    btn.innerText = "❌ Failed";
+                                    btn.style.backgroundColor = '#f44336';
+
+                                    // Construct feedback for general failure
+                                    let feedback = `[Local Execution Failed]\n`;
+                                    if (response && response.output && response.output.trim() !== "") {
+                                        feedback += `The code ran partially. Here is the output before it crashed:\n\`\`\`text\n${response.output}\n\`\`\`\n\n`;
+                                    }
+                                    feedback += `Here is the error traceback:\n\`\`\`python\n${response ? response.msg : "No details provided"}\n\`\`\`\nPlease analyze the reason for this failure and provide the corrected Python code.`;
+                                    feedBackToAI(feedback);
+
+                                    setTimeout(() => resetBtn(btn), 3000);
+                                }
+                            });
+                        } catch (err) {
+                            // Interceptor for network/extension errors
                             if (isAborted) {
                                 return;
                             }
 
-                            // Execution finished normally, remove the Stop button
+                            // Ensure Stop button is removed on unexpected errors
                             if (stopBtn.parentNode) {
                                 stopBtn.remove();
                             }
-
-                            // Handle Standard Success
-                            if (response && response.status === "success") {
-                                btn.innerText = "✅ Success!";
-                                btn.style.backgroundColor = '#10a37f';
-                                
-                                // Construct feedback if there was stdout
-                                if (response.output && response.output.trim() !== "") {
-                                    const feedback = `[Local Execution Success]\nHere is the terminal output from my local machine:\n\`\`\`text\n${response.output}\n\`\`\`\nPlease confirm if this matches the expected result.`;
-                                    feedBackToAI(feedback);
-                                }
-                                setTimeout(() => resetBtn(btn), 3000);
-                            }
-                            // Handle Missing Dependencies (Auto-pip workflow) 
-                            else if (response && response.status === "need_install") {
-                                const pkgs = response.packages.join(", ");
-                                const userAccepted = confirm(`📦 This script requires external packages: [ ${pkgs} ].\n\nDo you want the local agent to install them and run the code?`);
-                                
-                                if (userAccepted) {
-                                    btn.innerText = "⏳ Installing...";
-                                    btn.style.backgroundColor = '#ff9800';
-                                    
-                                    chrome.runtime.sendMessage({
-                                        action: "confirm_install_and_run",
-                                        code: codeContent,
-                                        packages: response.packages
-                                    }, (finalRes) => {
-                                        if (finalRes && finalRes.status === "success") {
-                                            btn.innerText = "✅ Success!";
-                                            btn.style.backgroundColor = '#10a37f';
-                                            
-                                            // Construct feedback for successful install+run
-                                            if (finalRes.output && finalRes.output.trim() !== "") {
-                                                const feedback = `[Local Execution Success]\nDependencies were installed automatically. Here is the terminal output from my local machine:\n\`\`\`text\n${finalRes.output}\n\`\`\`\nPlease confirm if this matches the expected result.`;
-                                                feedBackToAI(feedback);
-                                            }
-                                        } else {
-                                            btn.innerText = "❌ Failed";
-                                            btn.style.backgroundColor = '#f44336';
-                                            
-                                            // Construct feedback for failed install+run
-                                            let feedback = `[Local Execution Failed]\n`;
-                                            if (finalRes && finalRes.output && finalRes.output.trim() !== "") {
-                                                feedback += `The code ran partially. Here is the output before it crashed:\n\`\`\`text\n${finalRes.output}\n\`\`\`\n\n`;
-                                            }
-                                            feedback += `Here is the error traceback:\n\`\`\`python\n${finalRes ? finalRes.msg : "Unknown error"}\n\`\`\`\nPlease analyze the reason for this failure and provide the corrected Python code.`;
-                                            feedBackToAI(feedback);
-                                        }
-                                        setTimeout(() => resetBtn(btn), 3000);
-                                    });
-                                } else {
-                                    btn.innerText = "❌ Cancelled";
-                                    btn.style.backgroundColor = '#9e9e9e';
-                                    setTimeout(() => resetBtn(btn), 3000);
-                                }
-                            }
-                            // Handle General Execution Failure 
-                            else {
-                                btn.innerText = "❌ Failed";
-                                btn.style.backgroundColor = '#f44336';
-
-                                // Construct feedback for general failure
-                                let feedback = `[Local Execution Failed]\n`;
-                                if (response && response.output && response.output.trim() !== "") {
-                                    feedback += `The code ran partially. Here is the output before it crashed:\n\`\`\`text\n${response.output}\n\`\`\`\n\n`;
-                                }
-                                feedback += `Here is the error traceback:\n\`\`\`python\n${response ? response.msg : "No details provided"}\n\`\`\`\nPlease analyze the reason for this failure and provide the corrected Python code.`;
-                                feedBackToAI(feedback);
-
-                                setTimeout(() => resetBtn(btn), 3000);
-                            }
-                        });
-                    } catch (err) {
-                        // Interceptor for network/extension errors
-                        if (isAborted) {
-                            return;
+                            btn.innerText = "❌ Error";
+                            btn.style.backgroundColor = '#f44336';
+                            setTimeout(() => resetBtn(btn), 3000);
                         }
-                        btn.innerText = "❌ Error";
-                        btn.style.backgroundColor = '#f44336';
-                        setTimeout(() => resetBtn(btn), 3000);
-                    }
+                    };
+
+                    // Do NOT bypass security checks on the first try
+                    sendExecutionRequest(false);
                 });
             });
         });
@@ -387,5 +423,5 @@ if (document.getElementById('local-agent-lock')) {
 
     // Start the continuous DOM scanning loop (every 2 seconds)
     injectionInterval = setInterval(injectButtons, 2000);
-    console.log("✅ Local Agent V1.3.0 successfully started (anti-shadow clone singleton lock + AI Feedback Engine + User Input + Force Stop Button enabled)!");
+    console.log("✅ Local Agent V1.4.0 successfully started (anti-shadow clone singleton lock + AI Feedback Engine + User Input + Force Stop Button + Security Sandbox enabled)!");
 }

@@ -201,6 +201,43 @@ def check_missing_packages(code_string):
     return missing
 
 """
+Static code analysis to detect sensitive file modification or deletion operations.
+"""
+def check_security(code_string):
+    # Regex patterns for dangerous file operations
+    patterns = [
+        # Native Python file deletions & renaming
+        (r'\bos\.remove\s*\(', "Delete file (os.remove)"),
+        (r'\bos\.unlink\s*\(', "Delete file (os.unlink)"),
+        (r'\bshutil\.rmtree\s*\(', "Delete folder tree (shutil.rmtree)"),
+        (r'\bos\.rmdir\s*\(', "Delete folder (os.rmdir)"),
+        (r'\bos\.rename\s*\(', "Rename file (os.rename)"),
+        (r'\bos\.replace\s*\(', "Replace file (os.replace)"),
+        
+        # Native Python file writing
+        (r'\bopen\s*\([\s\S]*?[\'"][wax][tb\+]*[\'"]', "Modify file (open in write/append mode)"),
+        (r'\.write\s*\(', "Write to file (.write)"),
+        (r'\.write_text\s*\(', "Write to file (Pathlib.write_text)"),
+        (r'\.write_bytes\s*\(', "Write to file (Pathlib.write_bytes)"),
+        (r'\.unlink\s*\(', "Delete file (Pathlib.unlink)"),
+
+        # Third-Party Libraries (Excel, Pandas, Images, JSON) ====
+        (r'\.save\s*\(', "Save/Overwrite file (e.g., Excel/Image .save)"),
+        (r'\.to_[a-zA-Z0-9_]+\s*\(', "Export file (e.g., Pandas .to_csv/.to_excel)"),
+        (r'\bdump[s]?\s*\(', "Dump data to file (e.g., json.dump, pickle.dump)"),
+        (r'\bimwrite\s*\(', "Write image file (e.g., cv2.imwrite)"),
+    ]
+    
+    reasons = []
+    for pattern, desc in patterns:
+        if re.search(pattern, code_string):
+            if desc not in reasons:
+                reasons.append(desc)
+
+    # Return True if it is safe (0 reasons foun                
+    return len(reasons) == 0, reasons
+
+"""
 Main loop to keep the script running and listening for commands.
 """
 def main():
@@ -220,8 +257,21 @@ def main():
         # Run the code
         if action == "execute_command":
             if not code:
-                send_message({"status": "error", "msg": "Fatal Error: No code received."})
+                send_message({"status": "error", 
+                              "msg": "Fatal Error: No code received."})
                 continue
+
+            bypass_security = message.get("bypass_security", False)
+            if not bypass_security:
+                is_safe, reasons = check_security(code)
+                if not is_safe:
+                    # If unsafe, send a warning back to the browser and pause execution
+                    send_message({
+                        "status": "security_warning",
+                        "reasons": reasons,
+                        "msg": "Execution intercepted by Security Sandbox."
+                    })
+                    continue
 
             # Check if any packages need to be installed first
             missing_libs = check_missing_packages(code)

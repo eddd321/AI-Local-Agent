@@ -76,7 +76,9 @@ if (document.getElementById('local-agent-lock')) {
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (msg.action === "input_request") {
             const block = window.__activeAgentBlock;
-            if (!block) return;
+            if (!block) {
+                return;
+            }
 
             const container = document.createElement('div');
             container.className = 'local-agent-input-box';
@@ -239,8 +241,8 @@ if (document.getElementById('local-agent-lock')) {
                     stopBtn.innerText = "⏹️ Stop";
                     stopBtn.className = "local-stop-btn";
                     stopBtn.style.position = 'absolute';
-                    stopBtn.style.top = '45px';
-                    stopBtn.style.right = '115px';
+                    stopBtn.style.top = '75px';
+                    stopBtn.style.right = '12px';
                     stopBtn.style.zIndex = '9999';
                     stopBtn.style.padding = '4px 8px';
                     stopBtn.style.fontSize = '12px';
@@ -291,7 +293,9 @@ if (document.getElementById('local-agent-lock')) {
                             }, (response) => {
                                 
                                 // Stop doing anything if the user already clicked Stop
-                                if (isAborted) return; 
+                                if (isAborted) {
+                                    return;
+                                }
 
                                 // Security Warning
                                 if (response && response.status === "security_warning") {
@@ -305,7 +309,9 @@ if (document.getElementById('local-agent-lock')) {
                                         sendExecutionRequest(true); 
                                     } else {
                                         // User said no: cancel everything
-                                        if (stopBtn.parentNode) stopBtn.remove();
+                                        if (stopBtn.parentNode) {
+                                            stopBtn.remove();
+                                        }
                                         btn.innerText = "❌ Blocked";
                                         btn.style.backgroundColor = '#9e9e9e';
                                         setTimeout(() => resetBtn(btn), 3000);
@@ -313,11 +319,11 @@ if (document.getElementById('local-agent-lock')) {
                                     return; // Stop here and wait for the next try
                                 }
 
-                                // Remove the Stop button when finished
-                                if (stopBtn.parentNode) stopBtn.remove();
-
                                 // Handle Standard Success
                                 if (response && response.status === "success") {
+                                    if (stopBtn.parentNode) {
+                                        stopBtn.remove();
+                                    }
                                     btn.innerText = "✅ Success!";
                                     btn.style.backgroundColor = '#10a37f';
                                     
@@ -334,8 +340,30 @@ if (document.getElementById('local-agent-lock')) {
                                     
                                     if (userAccepted) {
                                         btn.innerText = "⏳ Installing...";
-                                        btn.style.backgroundColor = '#ff9800';
+                                        btn.style.backgroundColor = '#ff9800'; 
                                         
+                                        if (stopBtn && stopBtn.parentNode) {
+                                            // Remove any old event listeners by cloning the button
+                                            const freshStopBtn = stopBtn.cloneNode(true);
+                                            stopBtn.parentNode.replaceChild(freshStopBtn, stopBtn);
+                                            
+                                            // Assign new kill logic specifically for the pip installation process
+                                            freshStopBtn.addEventListener('click', (stopEvent) => {
+                                                stopEvent.stopPropagation();
+                                                isAborted = true; 
+                                                
+                                                // Send kill signal to terminate pip/python
+                                                chrome.runtime.sendMessage({ action: "force_stop" }); 
+                                                
+                                                freshStopBtn.remove();
+                                                btn.innerText = "❌ Aborted";
+                                                btn.style.backgroundColor = '#9e9e9e';
+                                                feedBackToAI(`\n❌ [Installation Aborted] You manually stopped the installation of [ ${pkgs} ].\n`);
+                                                setTimeout(() => resetBtn(btn), 3000);
+                                            });
+                                        }
+
+                                        // Send confirmation to backend to start installing packages
                                         chrome.runtime.sendMessage({
                                             action: "confirm_install_and_run",
                                             code: codeContent,
@@ -343,32 +371,32 @@ if (document.getElementById('local-agent-lock')) {
                                         }, (finalRes) => {
                                             if (isAborted) {
                                                 return;
-                                            } 
+                                            }
 
-                                            // Construct feedback for successful install + run
+                                            // Clean up the stop button when installation and execution are done
+                                            const activeStopBtn = block.querySelector('.local-stop-btn');
+                                            if (activeStopBtn) {
+                                                activeStopBtn.remove();
+                                            }
+
+                                            // Handle success/failure of the run after installation...
                                             if (finalRes && finalRes.status === "success") {
                                                 btn.innerText = "✅ Success!";
                                                 btn.style.backgroundColor = '#10a37f';
-                                                
                                                 if (finalRes.output && finalRes.output.trim() !== "") {
-                                                    const feedback = `[Local Execution Success]\nDependencies were installed automatically. Here is the terminal output from my local machine:\n\`\`\`text\n${finalRes.output}\n\`\`\`\nPlease confirm if this matches the expected result.`;
+                                                    const feedback = `[Local Execution Success]\nDependencies installed. Output:\n\`\`\`text\n${finalRes.output}\n\`\`\`\n`;
                                                     feedBackToAI(feedback);
                                                 }
                                             } else {
                                                 btn.innerText = "❌ Failed";
                                                 btn.style.backgroundColor = '#f44336';
-                                                
-                                                // Construct feedback for failed install + run
-                                                let feedback = `[Local Execution Failed]\n`;
-                                                if (finalRes && finalRes.output && finalRes.output.trim() !== "") {
-                                                    feedback += `The code ran partially. Here is the output before it crashed:\n\`\`\`text\n${finalRes.output}\n\`\`\`\n\n`;
-                                                }
-                                                feedback += `Here is the error traceback:\n\`\`\`python\n${finalRes ? finalRes.msg : "Unknown error"}\n\`\`\`\nPlease analyze the reason for this failure and provide the corrected Python code.`;
-                                                feedBackToAI(feedback);
+                                                feedBackToAI(`[Local Execution Failed]\n${finalRes ? finalRes.msg : "Unknown error"}`);
                                             }
                                             setTimeout(() => resetBtn(btn), 3000);
                                         });
                                     } else {
+                                        // If user declines the installation
+                                        if (stopBtn && stopBtn.parentNode) stopBtn.remove();
                                         btn.innerText = "❌ Cancelled";
                                         btn.style.backgroundColor = '#9e9e9e';
                                         setTimeout(() => resetBtn(btn), 3000);
@@ -376,6 +404,9 @@ if (document.getElementById('local-agent-lock')) {
                                 }
                                 // Handle General Execution Failure 
                                 else {
+                                    if (stopBtn.parentNode) {
+                                        stopBtn.remove();
+                                    }
                                     btn.innerText = "❌ Failed";
                                     btn.style.backgroundColor = '#f44336';
 
@@ -423,5 +454,5 @@ if (document.getElementById('local-agent-lock')) {
 
     // Start the continuous DOM scanning loop (every 2 seconds)
     injectionInterval = setInterval(injectButtons, 2000);
-    console.log("✅ Local Agent V1.5.0 successfully started (anti-shadow clone singleton lock + AI Feedback Engine + User Input + Force Stop Button + Security Sandbox + venv Isolation enabled)!");
+    console.log("✅ Local Agent V1.6.0 successfully started (anti-shadow clone singleton lock + AI Feedback Engine + User Input + Force Stop Button + Security Sandbox + venv Isolation + venv Reset enabled)!");
 }

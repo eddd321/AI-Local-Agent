@@ -25,19 +25,37 @@ def install():
     
     # Automatic Virtual Environment Creation
     print("🔍 Checking Python environment...")
-    if not os.path.exists(venv_dir):
+    
+    if os.path.exists(venv_dir):
+        print("⚠️ Isolated virtual environment (.venv) already exists.")
+        
+        # Ask the user if they want to delete the old one and build a new one
+        reset_choice = input("Do you want to RESET/REBUILD it? (Type 'y' to reset, 'n' to keep): ").strip().lower()
+        
+        if reset_choice == 'y':
+            print("🧹 Deleting the old environment (this may take a few seconds)...")
+            shutil.rmtree(venv_dir) # Delete the folder completely
+            
+            print("📦 Building a fresh virtual environment...")
+            try:
+                subprocess.run([sys.executable, "-m", "venv", venv_dir], check=True)
+                print("✅ Virtual environment reset successfully!\n")
+            except subprocess.CalledProcessError:
+                print("❌ Error: Failed to rebuild virtual environment.")
+                return
+        else:
+            print("✅ Keeping the existing virtual environment.\n")
+            
+    else:
+        # If it does not exist, create it for the first time
         print("📦 First time setup: Creating an isolated virtual environment...")
         print("⏳ This might take a few seconds...")
         try:
-            # Use the system's python to build the virtual environment folder
             subprocess.run([sys.executable, "-m", "venv", venv_dir], check=True)
             print("✅ Virtual environment created successfully!\n")
         except subprocess.CalledProcessError:
             print("❌ Error: Failed to create virtual environment.")
-            print("Please open terminal and run 'python -m venv .venv' manually.")
             return
-    else:
-        print("✅ Isolated virtual environment already exists.\n")
 
     print("⚙️ Locating executable wrappers...")
     if system_os == "Windows":

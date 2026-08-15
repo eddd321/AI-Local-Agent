@@ -13,6 +13,16 @@ import io
 import re
 import subprocess
 
+PACKAGE_ALIAS = {
+    'PIL': 'pillow',
+    'cv2': 'opencv-python',
+    'sklearn': 'scikit-learn',
+    'bs4': 'beautifulsoup4',
+    'pptx': 'python-pptx',
+    'docx': 'python-docx',
+    'yaml': 'pyyaml'
+}
+
 """
 Read a message sent from the Chrome Extension via standard input.
 """
@@ -148,6 +158,7 @@ def auto_install_missing_packages(code_string):
     for lib in imports:
         if lib in std_libs:
             continue
+        target_pkg = PACKAGE_ALIAS.get(lib, lib)
         
         try:
             # Check if the module is already installed
@@ -156,7 +167,7 @@ def auto_install_missing_packages(code_string):
             try:
                 # Run pip install silently in the background
                 subprocess.check_call(
-                    [sys.executable, "-m", "pip", "install", lib],
+                    [sys.executable, "-m", "pip", "install", target_pkg],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL
                 )
@@ -176,21 +187,12 @@ def check_missing_packages(code_string):
         'collections', 'itertools', 'functools', 'pathlib', 'io', 'subprocess',
         'urllib', 'http', 'socket', 'sqlite3', 'hashlib', 'base64', 'logging'
     }
-
-    # Map import names to actual PyPI package names
-    package_mapping = {
-        'PIL': 'pillow',
-        'cv2': 'opencv-python',
-        'sklearn': 'scikit-learn',
-        'bs4': 'beautifulsoup4'
-    }
     
     missing = []
     for lib in imports:
         if lib in std_libs:
-            continue
-        
-        target_pkg = package_mapping.get(lib, lib)
+            continue        
+        target_pkg = PACKAGE_ALIAS.get(lib, lib)
         
         try:
             # Check if the module is installed using the original code name

@@ -43,7 +43,7 @@ if (document.getElementById('local-agent-lock')) {
                 inputBox.value = feedbackText;
             }
         } else {
-            // For complex text boxes (like ChatGPT), move the cursor to the very end
+            // For complex text boxes (ChatGPT), move the cursor to the very end
             const selection = window.getSelection();
             const range = document.createRange();
             range.selectNodeContents(inputBox);
@@ -131,7 +131,6 @@ if (document.getElementById('local-agent-lock')) {
                     submitInput();
                 }
             };
-
             return true;
         }
     });
@@ -164,7 +163,7 @@ if (document.getElementById('local-agent-lock')) {
                 return;
             }
 
-            // Find all code blocks (Compatible with ChatGPT, Gemini, DeepSeek, etc.)
+            // Find all code blocks
             const codeBlocks = document.querySelectorAll('pre, div.code-block-wrapper, div[class*="code-block"]');
 
             codeBlocks.forEach(block => {
@@ -176,6 +175,36 @@ if (document.getElementById('local-agent-lock')) {
                 // Skip if block is already marked or button exists
                 if (block.dataset.agentInjected === "true" || block.querySelector('.local-run-btn')) {
                     return;
+                }
+
+                // Traverse up the DOM to find the parent chat bubble container
+                const chatBubble = block.closest('[data-message-author-role], .text-base, .message, div[class*="message"]');
+                
+                if (chatBubble) {
+                    // Identity verification (Who sent this message)
+                    const role = chatBubble.getAttribute('data-message-author-role');
+                    
+                    // If this message was sent by the user, block it completely.
+                    if (role === 'user' || chatBubble.className.includes('user')) {
+                        return; 
+                    }
+
+                    // Prevent buttons on system execution feedbacks
+                    const paragraphs = Array.from(chatBubble.querySelectorAll('p')).map(p => p.innerText).join('\n');
+                    if (paragraphs.includes('[Local Execution Success]') || 
+                        paragraphs.includes('[Local Execution Failed]') || 
+                        paragraphs.includes('[Local Execution Aborted]')) {
+                        return; 
+                    }
+                }
+
+                // Lenient Whitelist
+                const codeNode = block.querySelector('code');
+                if (codeNode) {
+                    const langClass = codeNode.className.toLowerCase();
+                    if (langClass.includes('language-') && !langClass.includes('python')) {
+                        return; 
+                    }
                 }
 
                 // Tag the current code block to prevent future injections
@@ -208,7 +237,7 @@ if (document.getElementById('local-agent-lock')) {
 
                 // Execute code when the button is clicked
                 btn.addEventListener('click', (e) => {
-                    // Prevent triggering the website's native click events (e.g., expanding the block)
+                    // Prevent triggering the website's native click events
                     e.stopPropagation();
 
                     if (btn.innerText !== "🚀 Run in Local") {
@@ -291,7 +320,6 @@ if (document.getElementById('local-agent-lock')) {
                                 code: codeContent,
                                 bypass_security: bypassSecurity // Tell Python forcing it to run
                             }, (response) => {
-                                
                                 // Stop doing anything if the user already clicked Stop
                                 if (isAborted) {
                                     return;
@@ -303,12 +331,12 @@ if (document.getElementById('local-agent-lock')) {
                                     const userAccepted = confirm(`🛡️ SECURITY WARNING\n\nThis script is trying to change or delete files.\n\nActions found:\n[ ${reasons} ]\n\nDo you want to ALLOW this to run?`);
                                     
                                     if (userAccepted) {
-                                        // User said yes: show red button and try again without security checks
+                                        // Show red button and try again without security checks
                                         btn.innerText = "⏳ Bypassing Sandbox...";
                                         btn.style.backgroundColor = '#f44336';
                                         sendExecutionRequest(true); 
                                     } else {
-                                        // User said no: cancel everything
+                                        // Cancel everything
                                         if (stopBtn.parentNode) {
                                             stopBtn.remove();
                                         }
@@ -379,7 +407,7 @@ if (document.getElementById('local-agent-lock')) {
                                                 activeStopBtn.remove();
                                             }
 
-                                            // Handle success/failure of the run after installation...
+                                            // Handle success/failure of the run after installation
                                             if (finalRes && finalRes.status === "success") {
                                                 btn.innerText = "✅ Success!";
                                                 btn.style.backgroundColor = '#10a37f';
@@ -396,7 +424,9 @@ if (document.getElementById('local-agent-lock')) {
                                         });
                                     } else {
                                         // If user declines the installation
-                                        if (stopBtn && stopBtn.parentNode) stopBtn.remove();
+                                        if (stopBtn && stopBtn.parentNode) {
+                                            stopBtn.remove();
+                                        }
                                         btn.innerText = "❌ Cancelled";
                                         btn.style.backgroundColor = '#9e9e9e';
                                         setTimeout(() => resetBtn(btn), 3000);
@@ -454,5 +484,5 @@ if (document.getElementById('local-agent-lock')) {
 
     // Start the continuous DOM scanning loop (every 2 seconds)
     injectionInterval = setInterval(injectButtons, 2000);
-    console.log("✅ Local Agent V1.6.1 successfully started (anti-shadow clone singleton lock + AI Feedback Engine + User Input + Force Stop Button + Security Sandbox + venv Isolation + venv Reset enabled)!");
+    console.log("✅ Local Agent V1.7.0 successfully started (anti-shadow clone singleton lock + AI Feedback Engine + User Input + Force Stop Button + AST Security Sandbox + venv Isolation + venv Reset enabled)!");
 }

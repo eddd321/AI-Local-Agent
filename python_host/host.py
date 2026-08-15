@@ -12,6 +12,7 @@ import struct
 import io
 import re
 import subprocess
+import ast
 
 PACKAGE_ALIAS = {
     'PIL': 'pillow',
@@ -202,46 +203,109 @@ def check_missing_packages(code_string):
                 missing.append(target_pkg)
     return missing
 
-"""
-Static code analysis to detect sensitive file modification or deletion operations.
-"""
-def check_security(code_string):
-    # Regex patterns for dangerous file operations
-    patterns = [
-        # Native Python file deletions & renaming
-        (r'\bos\.remove\s*\(', "Delete file (os.remove)"),
-        (r'\bos\.unlink\s*\(', "Delete file (os.unlink)"),
-        (r'\bshutil\.rmtree\s*\(', "Delete folder tree (shutil.rmtree)"),
-        (r'\bos\.rmdir\s*\(', "Delete folder (os.rmdir)"),
-        (r'\bos\.rename\s*\(', "Rename file (os.rename)"),
-        (r'\bos\.replace\s*\(', "Replace file (os.replace)"),
+class SecurityScanner(ast.NodeVisitor):
+    def __init__(self):
+        self.reasons = []
+        self.aliases = {}  # Tracks import aliases
         
-        # Native Python file writing
-        (r'\bopen\s*\([\s\S]*?[\'"][wax][tb\+]*[\'"]', "Modify file (open in write/append mode)"),
-        (r'\.write\s*\(', "Write to file (.write)"),
-        (r'\.write_text\s*\(', "Write to file (Pathlib.write_text)"),
-        (r'\.write_bytes\s*\(', "Write to file (Pathlib.write_bytes)"),
-        (r'\.unlink\s*\(', "Delete file (Pathlib.unlink)"),
+        # Core blacklist of dangerous functions
+        self.dangerous_calls = {
+            'os.remove': 'Delete file (os.remove)',
+            'os.unlink': 'Delete file (os.unlink)',
+            'shutil.rmtree': 'Delete folder tree (shutil.rmtree)',
+            'os.rmdir': 'Delete folder (os.rmdir)',
+            'os.rename': 'Rename file (os.rename)',
+            'os.replace': 'Replace file (os.replace)',
+            'os.system': 'System execution (os.system)',
+            'os.popen': 'System execution (os.popen)',
+            'subprocess.Popen': 'Subprocess execution (Popen)',
+            'eval': 'Dynamic execution (eval)',
+            'exec': 'Dynamic execution (exec)',
+            'getattr': 'Dynamic attribute access (getattr)'
+        }
 
-        # Third-Party Libraries (Excel, Pandas, Images, JSON) ====
-        (r'\.save\s*\(', "Save/Overwrite file (e.g., Excel/Image .save)"),
-        (r'\.to_[a-zA-Z0-9_]+\s*\(', "Export file (e.g., Pandas .to_csv/.to_excel)"),
-        (r'\bdump[s]?\s*\(', "Dump data to file (e.g., json.dump, pickle.dump)"),
-        (r'\bimwrite\s*\(', "Write image file (e.g., cv2.imwrite)"),
+    # Track standard import aliases
+    def visit_Import(self, node):
+        for alias in node.names:
+            local_name = alias.asname if alias.asname else alias.name
+            self.aliases[local_name] = alias.name
+        self.generic_visit(node)
 
-        (r'\bos\.system\s*\(', "Crash Risk: os.system writes directly to stdout"),
-        (r'\bos\.popen\s*\(', "Crash Risk: os.popen can corrupt communication pipeline"),
-        (r'pip\s+uninstall', "Modify Environment (pip uninstall)"),
-    ]
-    
-    reasons = []
-    for pattern, desc in patterns:
-        if re.search(pattern, code_string):
-            if desc not in reasons:
-                reasons.append(desc)
+    # Track 'from' import aliases
+    def visit_ImportFrom(self, node):
+        if node.module:
+            for alias in node.names:
+                local_name = alias.asname if alias.asname else alias.name
+                # Record as: os.module.name (e.g., os.remove)
+                self.aliases[local_name] = f"{node.module}.{alias.name}"
+        self.generic_visit(node)
 
-    # Return True if it is safe (0 reasons found)
-    return len(reasons) == 0, reasons
+    # Audit all function calls
+    def visit_Call(self, node):
+        func_name = self._get_full_func_name(node.func)
+        
+        if func_name:
+            # Check against the blacklist
+            if func_name in self.dangerous_calls:
+                self.reasons.append(self.dangerous_calls[func_name])
+            
+            # Special check for open(): Only intercept write/append modes (w, a, x, +)
+            elif func_name == 'open':
+                if self._is_write_mode(node):
+                    self.reasons.append("Modify file (open in write/append mode)")
+                    
+            # Intercept third-party library write/export methods
+            elif '.' in func_name:
+                method = func_name.split('.')[-1]
+                if method in ['save', 'to_csv', 'to_excel', 'to_json', 'to_sql', 'imwrite', 'dump', 'dumps']:
+                    self.reasons.append(f"Save/Export file (.{method})")
+
+        self.generic_visit(node)
+
+    # Resolve the true function name, bypassing aliases
+    def _get_full_func_name(self, node):
+        if isinstance(node, ast.Name):
+            return self.aliases.get(node.id, node.id)
+        elif isinstance(node, ast.Attribute):
+            value_name = self._get_full_func_name(node.value)
+            if value_name:
+                return f"{value_name}.{node.attr}"
+        return None
+
+    # Analyze open() arguments to determine if it's a dangerous write mode
+    def _is_write_mode(self, node):
+        # Check positional arguments
+        if len(node.args) >= 2:
+            arg = node.args[1]
+            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                if any(m in arg.value for m in ['w', 'a', 'x', '+']):
+                    return True
+        # Check keyword arguments
+        for kw in node.keywords:
+            if kw.arg == 'mode' and isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, str):
+                if any(m in kw.value.value for m in ['w', 'a', 'x', '+']):
+                    return True
+        return False
+
+
+def check_security(code_string):
+    """
+    Enterprise-grade static security scanning based on AST (Abstract Syntax Tree).
+    """
+    try:
+        # Parse the code into a syntax tree
+        tree = ast.parse(code_string)
+        scanner = SecurityScanner()
+        # Traverse the syntax tree for security auditing
+        scanner.visit(tree)
+        
+        # Remove duplicates and return reasons
+        reasons = list(set(scanner.reasons))
+        return len(reasons) == 0, reasons
+        
+    except SyntaxError as e:
+        # If the code has syntax errors, block it to prevent parsing exploitation
+        return False, [f"SyntaxError: Invalid Python code at line {e.lineno}"]
 
 """
 Main loop to keep the script running and listening for commands.
@@ -253,7 +317,7 @@ def main():
         if not message: 
             break # Stop if the browser disconnects
         
-        # If we get an answer for an input request, skip it here (custom_input handles it)
+        # If we get an answer for an input request, skip it here
         if message.get("action") == "input_response":
             continue 
 

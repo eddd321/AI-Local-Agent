@@ -10,6 +10,7 @@ import json
 import platform
 import shutil
 import subprocess
+import time  # Added for the delay after deleting the folder
 
 def install():
     # OS DETECTION 
@@ -34,7 +35,20 @@ def install():
         
         if reset_choice == 'y':
             print("🧹 Deleting the old environment (this may take a few seconds)...")
-            shutil.rmtree(venv_dir) # Delete the folder completely
+            
+            try:
+                shutil.rmtree(venv_dir) # Delete the folder completely
+                time.sleep(1) # Wait 1 second to let Windows release the files
+            except PermissionError:
+                print("\n🚨 [Error] Windows Access Denied (File in use)!")
+                print(f"Reason: Your source code editor (like VS Code) or a background process is currently using {venv_dir}.")
+                print("\n👉 How to fix this (Full Workflow):")
+                print("   Step 1: If your terminal prompt starts with '(.venv)', type: deactivate and press Enter.")
+                print("   Step 2: Click the 'Trash Can' icon in your editor to completely kill the current terminal.")
+                print("   Step 3: Open a brand new terminal (or use an external regular CMD).")
+                print("   Step 4: Run 'python install.py' again.")
+                print("\n   *Note: If it still fails, open Task Manager and kill any remaining 'python.exe' processes.*")
+                return
             
             print("📦 Building a fresh virtual environment...")
             try:
@@ -70,8 +84,28 @@ def install():
         
     print(f"✅ Using universal wrapper at: {script_path}\n")
 
+    manifest_path = os.path.join(current_dir, "manifest.json")
+
+    # Check if we already have a manifest file to avoid asking for ID again
+    if os.path.exists(manifest_path):
+        try:
+            with open(manifest_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                old_id = config.get("allowed_origins", [""])[0].replace("chrome-extension://", "").replace("/", "")
+            
+            print(f"🔍 Found existing configuration! Current Extension ID: {old_id}")
+            skip_choice = input("Do you want to CHANGE the Extension ID? (Type 'y' to change, press Enter to KEEP it): ").strip().lower()
+            
+            if skip_choice != 'y':
+                print("\n🚀 Skipping routing setup. Local AI Agent is ready!")
+                if system_os == "Windows":
+                    input("Press Enter to exit...")
+                return
+        except Exception:
+            pass # If reading fails, just ask for the ID normally below
+
     # Get Extension ID from user
-    print("Before entering your ID, please complete these steps in Chrome:")
+    print("\nBefore entering your ID, please complete these steps in Chrome:")
     print("  Step 1. Open your browser and navigate to: chrome://extensions/")
     print("  Step 2. Turn on 'Developer mode' (top right corner).")
     print("  Step 3. Click 'Load unpacked' and select the 'chrome_extension' folder.")
@@ -84,7 +118,6 @@ def install():
         return
 
     # Manifest Generation
-    manifest_path = os.path.join(current_dir, "manifest.json")
     manifest_data = {
         "name": "com.local.ai_agent",
         "description": "Local Python Agent",

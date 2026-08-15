@@ -423,5 +423,5 @@ if (document.getElementById('local-agent-lock')) {
 
     // Start the continuous DOM scanning loop (every 2 seconds)
     injectionInterval = setInterval(injectButtons, 2000);
-    console.log("✅ Local Agent V1.4.0 successfully started (anti-shadow clone singleton lock + AI Feedback Engine + User Input + Force Stop Button + Security Sandbox enabled)!");
+    console.log("✅ Local Agent V1.5.0 successfully started (anti-shadow clone singleton lock + AI Feedback Engine + User Input + Force Stop Button + Security Sandbox + venv Isolation enabled)!");
 }

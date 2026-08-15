@@ -12,3 +12,8 @@ __pycache__/
 # Ignore OS generated hidden files
 .DS_Store
 Thumbs.db
+
+# Ignore the Python Virtual Environment
+.venv/
+venv/
+env/

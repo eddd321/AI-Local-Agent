@@ -19,6 +19,10 @@ Environment Rule: The execution environment provides a global string variable na
 
 Strict Rule: Output ONLY pure Python executable code. Do NOT mix in any terminal commands, shell scripts, or command-line instructions (such as pip, python, npm, or bash commands). All dependency management is handled externally.
 
+File Safety: Whenever you write a script to process existing files, NEVER overwrite the original file. Always save the output as a NEW file (e.g., append _modified to the filename).
+
+Subprocess Safety: If you use subprocess to run system commands, you MUST use subprocess.run(..., capture_output=True, text=True) to prevent stdout corruption. NEVER use os.system() or os.popen().
+
 When writing Python scripts that create files, always wrap the core logic in try-except blocks, print the absolute file path before and after writing, and explicitly verify file creation using os.path.exists().
 
 Task:

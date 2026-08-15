@@ -226,6 +226,10 @@ def check_security(code_string):
         (r'\.to_[a-zA-Z0-9_]+\s*\(', "Export file (e.g., Pandas .to_csv/.to_excel)"),
         (r'\bdump[s]?\s*\(', "Dump data to file (e.g., json.dump, pickle.dump)"),
         (r'\bimwrite\s*\(', "Write image file (e.g., cv2.imwrite)"),
+
+        (r'\bos\.system\s*\(', "Crash Risk: os.system writes directly to stdout"),
+        (r'\bos\.popen\s*\(', "Crash Risk: os.popen can corrupt communication pipeline"),
+        (r'pip\s+uninstall', "Modify Environment (pip uninstall)"),
     ]
     
     reasons = []
@@ -234,7 +238,7 @@ def check_security(code_string):
             if desc not in reasons:
                 reasons.append(desc)
 
-    # Return True if it is safe (0 reasons foun                
+    # Return True if it is safe (0 reasons found)
     return len(reasons) == 0, reasons
 
 """

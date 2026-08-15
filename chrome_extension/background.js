@@ -4,6 +4,16 @@
  */
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === "force_stop") {
+        if (activeNativePort) {
+            // Disconnect active port. Chrome will immediately kill the underlying Python process.
+            activeNativePort.disconnect(); 
+            activeNativePort = null;
+            console.log("🛑 Native host process forcefully terminated by user.");
+        }
+        return false;
+    }
+
     // Route specific actions to the native messaging host
     if (request.action === "execute_command" || request.action === "confirm_install_and_run") {
         

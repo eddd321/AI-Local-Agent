@@ -79,6 +79,7 @@ if (document.getElementById('local-agent-lock')) {
             if (!block) return;
 
             const container = document.createElement('div');
+            container.className = 'local-agent-input-box';
             container.style.marginTop = '12px';
             container.style.padding = '12px';
             container.style.backgroundColor = '#f8fafc';
@@ -208,6 +209,8 @@ if (document.getElementById('local-agent-lock')) {
                     // Prevent triggering the website's native click events (e.g., expanding the block)
                     e.stopPropagation();
                     window.__activeAgentBlock = block;
+                    // State lock to prevent errors when pipeline disconnects
+                    let isAborted = false;
 
                     // Extract text content from the <code> tag or the block itself
                     const codeElement = block.querySelector('code');
@@ -226,12 +229,69 @@ if (document.getElementById('local-agent-lock')) {
                     btn.innerText = "⏳ Running...";
                     btn.style.backgroundColor = '#ff9800';
 
+                    // Dynamically create the red Stop button
+                    const stopBtn = document.createElement('button');
+                    stopBtn.innerText = "⏹️ Stop";
+                    stopBtn.className = "local-stop-btn";
+                    stopBtn.style.position = 'absolute';
+                    stopBtn.style.top = '45px';
+                    stopBtn.style.right = '115px';
+                    stopBtn.style.zIndex = '9999';
+                    stopBtn.style.padding = '4px 8px';
+                    stopBtn.style.fontSize = '12px';
+                    stopBtn.style.backgroundColor = '#f44336'; 
+                    stopBtn.style.color = 'white';
+                    stopBtn.style.border = 'none';
+                    stopBtn.style.borderRadius = '4px';
+                    stopBtn.style.cursor = 'pointer';
+                    stopBtn.style.fontWeight = '500';
+                    
+                    block.appendChild(stopBtn);
+
+                    //Stop Button Click Event
+                    stopBtn.addEventListener('click', (stopEvent) => {
+                        stopEvent.stopPropagation();
+                        
+                        // Lock the state so the main callback ignores the channel closure
+                        isAborted = true; 
+                        
+                        // Send the kill signal to the background script
+                        chrome.runtime.sendMessage({ action: "force_stop" });
+
+                        // Clean up any active input box hanging on the screen
+                        const activeInputBox = block.parentElement.querySelector('.local-agent-input-box');
+                        if (activeInputBox) {
+                            activeInputBox.remove();
+                        }
+                        
+                        // Update UI
+                        stopBtn.remove();
+                        btn.innerText = "❌ Aborted";
+                        btn.style.backgroundColor = '#9e9e9e';
+                        
+                        // Send smart feedback to the AI for self-correction
+                        const feedback = `[Local Execution Aborted]\nI manually terminated the script because it was running for a long time without responding.\n\nThis usually means one of two things:\n1. **Infinite Loop**: Please check the code for hanging \`while\` loops.\n2. **Heavy Computation**: If the code is just naturally slow, please rewrite it to include \`print()\` statements tracking the progress (e.g., printing progress every 10%).\n\nPlease analyze and provide the updated code.`;
+                        
+                        feedBackToAI(feedback);
+                        setTimeout(() => resetBtn(btn), 3000);
+                    });
+
                     // Send the sanitized code to the background script
                     try {
                         chrome.runtime.sendMessage({
                             action: "execute_command",
                             code: codeContent
                         }, (response) => {
+                            // Silently terminate if the user clicked Stop
+                            if (isAborted) {
+                                return;
+                            }
+
+                            // Execution finished normally, remove the Stop button
+                            if (stopBtn.parentNode) {
+                                stopBtn.remove();
+                            }
+
                             // Handle Standard Success
                             if (response && response.status === "success") {
                                 btn.innerText = "✅ Success!";
@@ -304,6 +364,10 @@ if (document.getElementById('local-agent-lock')) {
                             }
                         });
                     } catch (err) {
+                        // Interceptor for network/extension errors
+                        if (isAborted) {
+                            return;
+                        }
                         btn.innerText = "❌ Error";
                         btn.style.backgroundColor = '#f44336';
                         setTimeout(() => resetBtn(btn), 3000);
@@ -323,5 +387,5 @@ if (document.getElementById('local-agent-lock')) {
 
     // Start the continuous DOM scanning loop (every 2 seconds)
     injectionInterval = setInterval(injectButtons, 2000);
-    console.log("✅ Local Agent V1.2.0 successfully started (anti-shadow clone singleton lock + AI Feedback Engine + User Input enabled)!");
+    console.log("✅ Local Agent V1.3.0 successfully started (anti-shadow clone singleton lock + AI Feedback Engine + User Input + Force Stop Button enabled)!");
 }

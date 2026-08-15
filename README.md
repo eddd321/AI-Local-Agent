@@ -36,11 +36,11 @@ This project implements a seamless Inter-Process Communication (IPC) architectur
 3. **Backend (Python Host inside `.venv`):** Runs a robust event loop confined entirely within an isolated virtual environment. Before `exec()` is called, it parses the code into an **Abstract Syntax Tree (AST)** to intelligently detect and intercept dangerous file operations. It seamlessly handles auto-installation of missing dependencies (with Aliasing) without polluting the global OS.
 4. **Feedback Engine (The Bypass):** The extension receives the logs and uses advanced DOM manipulation (Native Setter Hijacking and Deep Paste Simulation) to inject contextual feedback directly into the AI's locked rich-text input box.
 
+## 🚀 Installation & Usage
+
 ### 📋 Prerequisites
 - **Python 3.8+** installed on your system and added to your `PATH`.
 - **Google Chrome** (or Chromium-based browser).
-
-## 🚀 Installation & Usage
 
 ### Step 1: Install the Chrome Extension
 1. Download or clone this repository to your local machine.

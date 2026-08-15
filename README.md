@@ -1,4 +1,4 @@
-# 🤖 Local AI Agent v1.6.0 (The Resilience Update)
+# 🤖 Local AI Agent v1.6.1 (The Engineering Prompt Update)
 
 ![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
 ![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-green)
@@ -13,8 +13,9 @@ As of **v1.6.0**, the architecture has been upgraded to a true **Enterprise-Grad
 
 ## ✨ Features
 
-- **🛡️ IPC Pipeline Flood Protection (NEW in v1.6.0):** Native Messaging pipelines are fragile. v1.6.0 introduces deep sub-process stdout interception (`capture_output`), ensuring that massive installations (like 2.5GB PyTorch progress bars) never flood the standard output and crash the Chrome communication channel.
-- **🧠 Smart Package Aliasing (NEW in v1.6.0):** AI models often hallucinate module names vs PyPI package names. The backend now features a built-in translation dictionary (e.g., `import cv2` -> `pip install opencv-python`, `import pptx` -> `pip install python-pptx`), silently neutralizing naming-mismatch errors.
+- **📜 The Ultimate System Prompt (NEW in v1.6.1):** Added official prompt engineering guidelines to completely eliminate AI hallucinations regarding dependencies, force safe local file parsing (chunking large files), and establish a strict 2-step protocol for reading local knowledge bases without overloading the Chrome IPC pipeline.
+- **🛡️ IPC Pipeline Flood Protection (v1.6.0):** Native Messaging pipelines are fragile. v1.6.0 introduces deep sub-process stdout interception (`capture_output`), ensuring that massive installations (like 2.5GB PyTorch progress bars) never flood the standard output and crash the Chrome communication channel.
+- **🧠 Smart Package Aliasing (v1.6.0):** AI models often hallucinate module names vs PyPI package names. The backend now features a built-in translation dictionary (e.g., `import cv2` -> `pip install opencv-python`, `import pptx` -> `pip install python-pptx`), silently neutralizing naming-mismatch errors.
 - **🧨 Installation Kill Switch & Environment Recovery (NEW in v1.6.0):** A dedicated `⏹️ Stop` button now dynamically mounts during dependency installations. If manually aborting an install corrupts your isolated environment, the `install.py` wizard now features a robust one-click nuke-and-rebuild disaster recovery system.
 - **📦 Isolated Virtual Environment (v1.5.0):** Complete environment isolation! The agent automatically builds and uses a dedicated `.venv` folder. Third-party libraries requested by the AI are installed securely inside this bubble, leaving your global OS Python pristine.
 - **🌍 Universal Cross-Platform Architecture (v1.5.0):** Fully Git-friendly and supports Windows, macOS, and Linux natively. Uses static, dynamic-path wrappers (`.bat` and `.sh`) that automatically adapt to wherever the project is cloned.

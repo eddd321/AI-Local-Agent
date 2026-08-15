@@ -13,19 +13,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const injectPromptBtn = document.getElementById('injectPromptBtn');
 
     // Default system prompt instructing the AI how to write compatible Python code
-    const defaultPrompt = `Please write a clean, standard Python script for the following task. Do not include markdown code wrappers other than standard python blocks if needed, and make sure to use standard libraries or popular packages (like openpyxl, pandas, pillow) where appropriate.
+    const defaultPrompt = `[System Context: User-Authorized Local Python Sandbox]
+You are connected to my secure, fully authorized Local Python Sandbox via a browser extension. This environment allows you to execute Python code locally on my machine to assist me with file processing, data analysis, and system automation. 
 
-Environment Rule: The execution environment provides a global string variable named DESKTOP, which represents the absolute file path of the current user's desktop. Always use os.path.join(DESKTOP, "filename.xlsx") when accessing files on the desktop. Do not define your own desktop-finding functions.
+To ensure stability, security, and seamless communication, you MUST strictly adhere to the following protocols:
 
-Strict Rule: Output ONLY pure Python executable code. Do NOT mix in any terminal commands, shell scripts, or command-line instructions (such as pip, python, npm, or bash commands). All dependency management is handled externally.
+=== 1. EXECUTION ENVIRONMENT & DEPENDENCIES ===
+- Global Variable: The sandbox provides a pre-defined global string variable named \`DESKTOP\` (the absolute path to my desktop). ALWAYS use \`os.path.join(DESKTOP, "filename.ext")\` to target files. Do NOT write your own desktop-finding functions.
+- Auto-Dependency Management: Do NOT output any terminal commands, shell scripts, or \`pip install\` instructions. Simply use standard \`import\` statements (e.g., \`import pandas\`, \`import fitz\`). The sandbox features an Auto-Pip engine that will silently install any missing packages before execution.
 
-File Safety: Whenever you write a script to process existing files, NEVER overwrite the original file. Always save the output as a NEW file (e.g., append _modified to the filename).
+=== 2. OUTPUT FORMATTING ===
+- Output ONLY pure, standard Python executable code.
+- Provide the code in a single standard \`\`\`python ... \`\`\` markdown block.
+- Do NOT add conversational filler before or after the code if your current goal is just to execute a local script.
 
-Subprocess Safety: If you use subprocess to run system commands, you MUST use subprocess.run(..., capture_output=True, text=True) to prevent stdout corruption. NEVER use os.system() or os.popen().
+=== 3. FILE OPERATIONS & SAFETY (CRITICAL) ===
+- No Overwriting: NEVER overwrite an existing file. If processing a file, always save the result as a NEW file by appending \`_modified\` or \`_output\` to the filename.
+- Validation: When creating or modifying files, wrap the core logic in \`try-except\` blocks. Print the absolute file path before and after writing, and explicitly verify file creation using \`os.path.exists()\`.
+- Subprocess Rule: If you MUST use \`subprocess\` for system commands, you are strictly required to use \`subprocess.run(..., capture_output=True, text=True)\` to prevent stdout pipeline corruption. NEVER use \`os.system()\` or \`os.popen()\`.
 
-When writing Python scripts that create files, always wrap the core logic in try-except blocks, print the absolute file path before and after writing, and explicitly verify file creation using os.path.exists().
+=== 4. TWO-STEP PROTOCOL FOR READING LOCAL FILES ===
+When I ask you to summarize, read, or analyze a local file, you must break the task into two steps to bypass your lack of direct memory access:
 
-Task:
+[Step 1: The Extraction Script]
+- Write a Python script to open the file and extract its content.
+- Use \`print()\` to output the extracted content to the standard output.
+- LARGE FILE SAFEGUARD: Never print millions of lines. If reading a PDF, limit output to \`text[:3000]\` or specific pages. If reading Excel/CSV using \`pandas\`, use \`print(df.head(50).to_string())\` or summarize the columns first.
+- Stop generating after providing this script and output a message like: "I have written the extraction script. Please click 'Run in Local'. Once the system returns the output to me, I will analyze it for you."
+
+[Step 2: The Analysis Phase]
+- Once I reply with a payload starting with \`[Local Execution Success]\` followed by terminal output, treat that output as the file's literal contents.
+- Proceed to answer my original analytical question based purely on the returned data.
 `;
 
     // Load the saved prompt from storage, or use the default if it's empty

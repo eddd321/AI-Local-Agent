@@ -27,6 +27,24 @@ As of **v1.7.0**, the architecture has been upgraded to a true **Enterprise-Grad
 - **🔄 Automated AI Feedback Loop:** Automatically captures standard output (`print`) and Python error tracebacks, seamlessly pasting the results directly back into the AI's chatbox for instant self-debugging!
 - **🚀 One-Click UI Injection:** Automatically injects a native `🚀 Run in Local` button directly onto code blocks in standard AI chat interfaces.
 
+## 🎯 Capabilities & Limitations
+
+This agent gives web-based AI immense power, but it operates under specific architectural constraints. Here is a clear breakdown of what it can and cannot do:
+
+### ✅ What it CAN do:
+- **Local File Manipulation:** Securely read, write, and process local files (CSVs, PDFs, images, codebases) subject to AST Sandbox approval.
+- **Dynamic Dependency Installation:** Auto-install missing PyPI packages (e.g., `pandas`, `requests`, `pyautogui`) exclusively inside the isolated `.venv` without polluting your global OS.
+- **OS-Level Automation (RPA):** Launch local desktop applications, manipulate system files, and execute background tasks (e.g., controlling desktop apps via keyboard/mouse simulation).
+- **Interactive Scripts:** Handle basic `input()` prompts natively within the AI's web chat interface.
+- **Error Self-Correction:** Feed execution tracebacks and `print()` logs directly back to the AI for autonomous debugging. The Agent acts as an immortal "compiler" that helps the AI fix its own code.
+
+### ❌ What it CANNOT do (Current Limitations):
+- **Hijack Already-Open Browser Tabs:** Standard Python scripts (like Selenium/Playwright) launched by the AI will open *new, isolated* browser instances. They cannot magically control the Chrome tabs you are currently browsing unless Chrome was specifically launched with remote-debugging enabled.
+- **Interact with Native GUIs Vision:** If the AI writes a script that opens a native desktop GUI window (like `tkinter`, `pygame`, or a matplotlib plot), the script will run successfully, but the AI cannot "see", click, or directly interact with that external window's UI elements natively (unless using physical coordinate simulation like `pyautogui`).
+- **Survive Page Refreshes:** The Inter-Process Communication (IPC) is tied to your current active Chrome tab. If you refresh the AI chat page while a local script is running, the pipeline connection is severed, and the script's execution is orphaned.
+- **Guarantee Third-Party Library Compatibility:** The Agent's core is bulletproof, but if the AI generates code using libraries that are incompatible with your current Python version (e.g., `wxauto` on bleeding-edge Python 3.14/3.11+), the execution will fail. **Tip:** Ask the AI to use universally compatible RPA libraries like `pyautogui` instead of deep API-hooking libraries.
+- **Non-Python Languages:** Currently, the AST security sandbox and execution host are strictly designed for **Python**. Execution of Bash, JavaScript, or C++ blocks is not supported.
+
 ## 🏗️ Architecture
 
 This project implements a seamless Inter-Process Communication (IPC) architecture with an advanced feedback, interactive IO, and security engine:
